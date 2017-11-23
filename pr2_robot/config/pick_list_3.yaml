@@ -1,4 +1,6 @@
 object_list:
+  - name: soap
+    group: green
   - name: sticky_notes
     group: red
   - name: book
@@ -10,8 +12,6 @@ object_list:
   - name: eraser
     group: red
   - name: soap2
-    group: green
-  - name: soap
     group: green
   - name: glue
     group: red

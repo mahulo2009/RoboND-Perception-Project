@@ -20,6 +20,7 @@ from geometry_msgs.msg import Pose
 from std_msgs.msg import Float64
 from std_msgs.msg import Int32
 from std_msgs.msg import String
+from std_srvs.srv import Empty
 from pr2_robot.srv import *
 from rospy_message_converter import message_converter
 import yaml
@@ -47,6 +48,19 @@ def send_to_yaml(yaml_filename, dict_list):
 
 # Callback function for your Point Cloud Subscriber
 def pcl_callback(ros_msg):
+
+    ##TODO REMOVE PREVIOUS MAPS  
+    rospy.wait_for_service('/clear_octomap')
+    try:
+        clear_octomap = rospy.ServiceProxy('/clear_octomap', Empty)
+	clear_octomap()
+        print ("Response: OK" )     
+    except rospy.ServiceException, e:
+        print "Service clear_octomap call failed: %s"%e	
+
+    
+    
+   
     ### Convert ROS msg to PCL data
     pcl_data = ros_to_pcl(ros_msg) 
 
@@ -121,6 +135,8 @@ def pcl_callback(ros_msg):
     ### Publish ROS messages
     pcl_objects_pub.publish(ros_objects_msg)
     pcl_table_pub.publish(ros_table_msg)
+    #TODO
+    collidable_pub.publish(ros_table_msg)
 
     detected_objects = []
     detected_objects_labels = []
@@ -147,6 +163,7 @@ def pcl_callback(ros_msg):
         do.label = label
         do.cloud = ros_data_single_object_clustered
         detected_objects.append(do)
+	collidable_pub.publish(ros_data_single_object_clustered)
 
     ### Publish the list of detected objects
     rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
@@ -177,9 +194,19 @@ def pr2_mover(detected_object_list):
     dict_list=[]
     ### Loop through the pick list
     for pick_object in pick_object_list:
-	for detected_object in detected_object_list:
-		if pick_object['name'] == detected_object.label:
+        print("Search Pick: ",pick_object['name'])
+	for detected_object in detected_object_list:		
+		print("Current detected_object: ",detected_object.label)
+		if pick_object['name'] == detected_object.label:		
 			object_name.data=pick_object['name']
+			print("Pick: ",pick_object['name'])
+
+			#TODO
+			for detected_object_colliable in detected_object_list:
+				if detected_object_colliable.label!=detected_object.label:
+					print("Coolliable: ",detected_object_colliable.label)
+					collidable_pub.publish(detected_object_colliable.cloud)
+
 			# Calculate the centroid
 			centroid=np.mean(ros_to_pcl(detected_object.cloud).to_array(), axis=0)[:3]
 			# Fill up the position for the pick object
@@ -208,20 +235,25 @@ def pr2_mover(detected_object_list):
 			    # Insert your message variables to be sent as a service request
 			    resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
 			    print ("Response: ",resp.success)
+			    
 			except rospy.ServiceException, e:
-			    print "Service call failed: %s"%e
-			break
+			    print "Service call failed: %s"%e	
+
+			return
     # Output your request parameters into output yaml file
     send_to_yaml("dict_list.yaml",dict_list)
 
 if __name__ == '__main__':
     # ROS node initialization
     rospy.init_node('clustering',anonymous=True)
+    #TODO
+    
     # Create Subscribers
     pcl_sub = rospy.Subscriber("/pr2/world/points",PointCloud2, pcl_callback, queue_size=1)
     # Create Publishers
     pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)
     pcl_table_pub = rospy.Publisher("/pcl_table",PointCloud2, queue_size=1)
+    collidable_pub = rospy.Publisher("/pr2/3d_map/points",PointCloud2, queue_size=1)
     object_markers_pub = rospy.Publisher("/object_markers",Marker,queue_size=1)
     # Load Model From disk
     model = pickle.load(open('model.sav', 'rb'))
