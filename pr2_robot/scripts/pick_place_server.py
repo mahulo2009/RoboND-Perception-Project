@@ -52,7 +52,7 @@ def pcl_callback(ros_msg):
 
     ###  Statistical Outlier Filtering
     statistical_outlier_filter = pcl_data.make_statistical_outlier_filter()
-    statistical_outlier_filter.set_mean_k(20)
+    statistical_outlier_filter.set_mean_k(10)
     statistical_outlier_filter.set_std_dev_mul_thresh(0.01)
     pcl_data = statistical_outlier_filter.filter()
 
@@ -122,7 +122,7 @@ def pcl_callback(ros_msg):
     pcl_objects_pub.publish(ros_objects_msg)
     pcl_table_pub.publish(ros_table_msg)
 
-    detected_objects = {}
+    detected_objects = []
     detected_objects_labels = []
     ### Classify the clusters! (loop through each detected cluster one at a time)
     for index, pts_list in enumerate(cluster_indices):
@@ -146,7 +146,7 @@ def pcl_callback(ros_msg):
         do = DetectedObject()
         do.label = label
         do.cloud = ros_data_single_object_clustered
-        detected_objects[label]=do
+        detected_objects.append(do)
 
     ### Publish the list of detected objects
     rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
@@ -160,81 +160,59 @@ def pcl_callback(ros_msg):
         pass
 
 # function to load parameters and request PickPlace service
-def pr2_mover(detected_objects):
-
-    # TODO: Initialize variables
+def pr2_mover(detected_object_list):
+    # Initialize variables
     test_scene_num = Int32()
-    test_scene_num.data = 2
+    #TODO GET THIS VALUE
+    test_scene_num.data = 3 
     arm_name = String() 
     object_name = String() 
     pick_pose = Pose()
     place_pose = Pose()
-
-    dict_list=[]
-    # TODO: Get/Read parameters
-    object_list_param = rospy.get_param('/object_list')
-    dropbox_list_param = rospy.get_param('/dropbox')
-
-    # TODO: Parse parameters into individual variables
-
+    # Get/Read parameters
+    pick_object_list = rospy.get_param('/object_list')
+    dropbox_list = rospy.get_param('/dropbox')
     # TODO: Rotate PR2 in place to capture side tables for the collision map
 
-    # TODO: Loop through the pick list
-    for object_param in object_list_param:
-	print ("Loop: " ,object_param['name'])        
-        object_name.data = object_param['name']
-        # Get the PointCloud for a given object and obtain it's centroid
-	detected_object = detected_objects[object_name.data]
-        centroid=np.mean(ros_to_pcl(detected_object.cloud).to_array(), axis=0)[:3]
-
-	print ("Loop: " ,object_param['name'], " " , centroid[0], " " , centroid[1], " ", centroid[2])        
-
-        pick_pose.position.x=np.asscalar(centroid[0])
-        pick_pose.position.y=np.asscalar(centroid[1])
-        pick_pose.position.z=np.asscalar(centroid[2])
-
-        pick_pose.orientation.x=0.0
-        pick_pose.orientation.y=0.0
-        pick_pose.orientation.z=0.0
-        pick_pose.orientation.w=0.0
-
-        # Assign the arm to be used for pick_place
-        if (object_param['group'] == "green"):
-		arm_name.data = "right"
-                for dropbox in dropbox_list_param:
-			if (dropbox['name']=="right"):
-				dropbox_position =  dropbox['position']
-	else:
-		arm_name.data = "left"
-                for dropbox in dropbox_list_param:
-			if (dropbox['name']=="left"):
-				dropbox_position =  dropbox['position']
-
-        place_pose.position.x=dropbox_position[0]
-        place_pose.position.y=dropbox_position[1]
-        place_pose.position.z=dropbox_position[2]
-
-        place_pose.orientation.x=0.0
-        place_pose.orientation.y=0.0
-        place_pose.orientation.z=0.0
-        place_pose.orientation.w=0.0
-
-        # Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
-        yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
-        dict_list.append(yaml_dict)
-
-        # Wait for 'pick_place_routine' service to come up
-        #rospy.wait_for_service('pick_place_routine')
-        #try:
-        #    pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
-        #    # Insert your message variables to be sent as a service request
-        #    resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-        #    print ("Response: ",resp.success)
-        #except rospy.ServiceException, e:
-        #    print "Service call failed: %s"%e
+    dict_list=[]
+    ### Loop through the pick list
+    for pick_object in pick_object_list:
+	for detected_object in detected_object_list:
+		if pick_object['name'] == detected_object.label:
+			object_name.data=pick_object['name']
+			# Calculate the centroid
+			centroid=np.mean(ros_to_pcl(detected_object.cloud).to_array(), axis=0)[:3]
+			# Fill up the position for the pick object
+			pick_pose.position.x=np.asscalar(centroid[0])
+			pick_pose.position.y=np.asscalar(centroid[1])
+			pick_pose.position.z=np.asscalar(centroid[2])
+			# Find the box to drop the object into.
+			for dropbox in dropbox_list:
+				if dropbox['group']==pick_object['group']:
+					arm_name.data=dropbox['name']	
+					dropbox_position = dropbox['position']
+					break
+			# Fill up the box position
+			place_pose.position.x=dropbox_position[0]
+			place_pose.position.y=dropbox_position[1]
+			place_pose.position.z=dropbox_position[2]
+			# Log 
+			rospy.loginfo('Pick object {} with arm: {} and position [{},{},{}]'.format(object_name.data,arm_name.data,centroid[0],centroid[1],centroid[2]))
+			# Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
+			yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
+			dict_list.append(yaml_dict)
+			# Wait for 'pick_place_routine' service to come up
+			rospy.wait_for_service('pick_place_routine')
+			try:
+			    pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+			    # Insert your message variables to be sent as a service request
+			    resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
+			    print ("Response: ",resp.success)
+			except rospy.ServiceException, e:
+			    print "Service call failed: %s"%e
+			break
     # Output your request parameters into output yaml file
     send_to_yaml("dict_list.yaml",dict_list)
-
 
 if __name__ == '__main__':
     # ROS node initialization
