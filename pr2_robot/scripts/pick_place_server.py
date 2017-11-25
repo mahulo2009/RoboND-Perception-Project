@@ -49,18 +49,16 @@ def send_to_yaml(yaml_filename, dict_list):
 # Callback function for your Point Cloud Subscriber
 def pcl_callback(ros_msg):
 
-    ##TODO REMOVE PREVIOUS MAPS  
+    #TODO REMOVE THIS
     rospy.wait_for_service('/clear_octomap')
     try:
         clear_octomap = rospy.ServiceProxy('/clear_octomap', Empty)
-	clear_octomap()
+        clear_octomap()
         print ("Response: OK" )     
     except rospy.ServiceException, e:
-        print "Service clear_octomap call failed: %s"%e	
-
-    
-    
-   
+        print "Service clear_octomap call failed: %s"%e
+    rospy.sleep(5.0)
+           
     ### Convert ROS msg to PCL data
     pcl_data = ros_to_pcl(ros_msg) 
 
@@ -135,7 +133,7 @@ def pcl_callback(ros_msg):
     ### Publish ROS messages
     pcl_objects_pub.publish(ros_objects_msg)
     pcl_table_pub.publish(ros_table_msg)
-    #TODO
+    #TODO REMOVE THIS
     collidable_pub.publish(ros_table_msg)
 
     detected_objects = []
@@ -161,9 +159,9 @@ def pcl_callback(ros_msg):
         # Add the detected object to the list of detected objects.
         do = DetectedObject()
         do.label = label
-        do.cloud = ros_data_single_object_clustered
+        do.cloud = pcl_data_single_object_clustered
         detected_objects.append(do)
-	collidable_pub.publish(ros_data_single_object_clustered)
+	
 
     ### Publish the list of detected objects
     rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
@@ -201,14 +199,14 @@ def pr2_mover(detected_object_list):
 			object_name.data=pick_object['name']
 			print("Pick: ",pick_object['name'])
 
-			#TODO
+			#TODO 
 			for detected_object_colliable in detected_object_list:
 				if detected_object_colliable.label!=detected_object.label:
-					print("Coolliable: ",detected_object_colliable.label)
-					collidable_pub.publish(detected_object_colliable.cloud)
+					print("detected_object_colliable=", detected_object_colliable.label)
+					collidable_pub.publish(pcl_to_ros(detected_object_colliable.cloud))
 
 			# Calculate the centroid
-			centroid=np.mean(ros_to_pcl(detected_object.cloud).to_array(), axis=0)[:3]
+			centroid=np.mean(detected_object.cloud.to_array(), axis=0)[:3]
 			# Fill up the position for the pick object
 			pick_pose.position.x=np.asscalar(centroid[0])
 			pick_pose.position.y=np.asscalar(centroid[1])
