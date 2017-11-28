@@ -2,13 +2,18 @@
 
 [//]: # (Image References)
 
-[image1]: ./misc_images/exercise-1-tablepod.png
-[image2]: ./misc_images/exercise-1-voxgrid.png
-[image3]: ./misc_images/exercise-1-passthrough.png
-[image4]: ./misc_images/exercise-1-inliers.png
-[image5]: ./misc_images/exercise-1-outliers.png
-[image6]: ./misc_images/exercise-2-gazebo.png
-[image7]: ./misc_images/exercise-2-rviz.png
+[image1]:  ./misc_images/exercise-1-tablepod.png
+[image2]:  ./misc_images/exercise-1-voxgrid.png
+[image3]:  ./misc_images/exercise-1-passthrough.png
+[image4]:  ./misc_images/exercise-1-inliers.png
+[image5]:  ./misc_images/exercise-1-outliers.png
+[image6]:  ./misc_images/exercise-2-gazebo.png
+[image7]:  ./misc_images/exercise-2-rviz.png
+[image8]:  ./misc_images/exercise-3-caputre-features.png
+[image9]:  ./misc_images/exercise-3-training-svm.png
+[image10]: ./misc_images/exercise-3-object-recognition.png
+
+
 
 
 ## Pipeline for filtering and RANSAC plane fitting implemented.
@@ -134,6 +139,107 @@ for i, indice in enumerate(indices):
 ```
 
 ![alt text][image7]
+
+
+## Features extracted and SVM trained. Object recognition implemented.
+
+In this exercise I am going to train a Support Vector Machine to recognize objects in a scene. A gazebo world containing the tablepod and the objects on top, the same than in the previous exercies, is provided. From these objects some features are extracted: histogram for both the HSV colorspace and the normal's surface. These extract features are used to train the SVN classifier, finally the classifier will predict what objects are in a segmented Point Cloud.
+
+### Generating Features
+
+For every object in the training scene its features are extracted. At the end the information is safe into the training_set.sav file. The number of different poses for the object have been increase to one hundred. Finally, the HSV colorspace is used, rather than the RBG, because it behaviour is better when the ilumination of the scene change.
+
+```python
+labeled_features = []
+for model_name in models:
+	spawn_model(model_name)
+
+	for i in range(100):
+	    # make five attempts to get a valid a point cloud then give up
+	    sample_was_good = False
+	    try_count = 0
+	    while not sample_was_good and try_count < 5:
+		sample_cloud = capture_sample()
+		sample_cloud_arr = ros_to_pcl(sample_cloud).to_array()
+
+		# Check for invalid clouds.
+		if sample_cloud_arr.shape[0] == 0:
+		    print('Invalid cloud detected')
+		    try_count += 1
+		else:
+		    sample_was_good = True
+
+	    # Extract histogram features
+	    chists = compute_color_histograms(sample_cloud, using_hsv=True)
+	    normals = get_normals(sample_cloud)
+	    nhists = compute_normal_histograms(normals)
+	    feature = np.concatenate((chists, nhists))
+	    labeled_features.append([feature, model_name])
+
+delete_model()
+pickle.dump(labeled_features, open('training_set.sav', 'wb'))
+```
+
+![alt text][image8]
+
+### Train the SVM
+
+After the features have been generated the SVM will be trained. The result is safe into the model.sav file.
+
+![alt text][image9]
+
+
+### Object recognition
+
+The previously SVM trained is used to recognize the object on the scene. The ros node created in the previous exercise is modified to include the SVM prediction.
+
+```python
+detected_objects = []
+detected_objects_labels = []
+# Classify the clusters! (loop through each detected cluster one at a time)
+for index, pts_list in enumerate(cluster_indices):
+    # Grab the points for the cluster
+    pcl_data_single_object_clustered = pcl_data_objects.extract(pts_list)
+    ros_data_single_object_clustered = pcl_to_ros(pcl_data_single_object_clustered)
+    # Compute the associated feature vector
+    chists = compute_color_histograms(ros_data_single_object_clustered,using_hsv=True)
+    normals = get_normals(ros_data_single_object_clustered)
+    nhists = compute_normal_histograms(normals)
+    feature = np.concatenate((chists, nhists))
+    # Make the prediction
+    prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
+    label = encoder.inverse_transform(prediction)[0]
+    detected_objects_labels.append(label)
+    # Publish a label into RViz
+    label_pos = list(pcl_data_objects_xyz[pts_list[0]])
+    label_pos[2] += .4
+    object_markers_pub.publish(make_label(label,label_pos, index))
+    # Add the detected object to the list of detected objects.
+    do = DetectedObject()
+    do.label = label
+    do.cloud = ros_data_single_object_clustered
+    detected_objects.append(do)
+
+# Publish the list of detected objects
+rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
+detected_objects_pub.publish(detected_objects)
+```
+
+![alt text][image10]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
