@@ -1,17 +1,25 @@
 object_list:
   - name: soap
     group: green
+    offset: -0.2
   - name: sticky_notes
     group: red
+    offset: 0
   - name: book
     group: red
+    offset: 0
   - name: snacks
     group: green
+    offset: 0
   - name: biscuits
     group: green
+    offset: 0
   - name: eraser
     group: red
+    offset: 0
   - name: soap2
     group: green
+    offset: 0
   - name: glue
     group: red
+    offset: 0

@@ -371,7 +371,9 @@ bool PR2PickPlace::IsPickPoseWithinLimits(geometry_msgs::Pose &pick_pose,
     +(act_obj_pose.position.y-pick_pose.position.y)*(act_obj_pose.position.y-pick_pose.position.y)
     +(act_obj_pose.position.z-pick_pose.position.z)*(act_obj_pose.position.z-pick_pose.position.z);
 
-  if(dist_sq < 0.03)
+  ROS_INFO_STREAM("IsPickPoseWithinLimits: "<<dist_sq);
+
+  if(dist_sq < 0.1)
     return true;
   else
     return false;

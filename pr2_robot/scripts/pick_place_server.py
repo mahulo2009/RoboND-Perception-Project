@@ -65,7 +65,7 @@ def pcl_callback(ros_msg):
     ###  Statistical Outlier Filtering
     statistical_outlier_filter = pcl_data.make_statistical_outlier_filter()
     statistical_outlier_filter.set_mean_k(10)
-    statistical_outlier_filter.set_std_dev_mul_thresh(0.01)
+    statistical_outlier_filter.set_std_dev_mul_thresh(0.1)
     pcl_data = statistical_outlier_filter.filter()
 
     ###  Voxel Grid Downsampling
@@ -141,11 +141,11 @@ def pcl_callback(ros_msg):
     ### Classify the clusters! (loop through each detected cluster one at a time)
     for index, pts_list in enumerate(cluster_indices):
         # Grab the points for the cluster
-        pcl_data_single_object_clustered = pcl_data_objects.extract(pts_list)
-        ros_data_single_object_clustered = pcl_to_ros(pcl_data_single_object_clustered)
+        pcl_data_single_object = pcl_data_objects.extract(pts_list)
+        ros_data_single_object = pcl_to_ros(pcl_data_single_object)
         # Compute the associated feature vector
-        chists = compute_color_histograms(ros_data_single_object_clustered,using_hsv=True)
-        normals = get_normals(ros_data_single_object_clustered)
+        chists = compute_color_histograms(ros_data_single_object,using_hsv=True)
+        normals = get_normals(ros_data_single_object)
         nhists = compute_normal_histograms(normals)
         feature = np.concatenate((chists, nhists))
         # Make the prediction
@@ -159,8 +159,10 @@ def pcl_callback(ros_msg):
         # Add the detected object to the list of detected objects.
         do = DetectedObject()
         do.label = label
-        do.cloud = pcl_data_single_object_clustered
+        do.cloud = pcl_data_single_object
         detected_objects.append(do)
+        filename = label+'.pcd'
+	pcl.save(pcl_data_single_object, filename)
 	
 
     ### Publish the list of detected objects
@@ -218,7 +220,7 @@ def pr2_mover(detected_object_list):
 					dropbox_position = dropbox['position']
 					break
 			# Fill up the box position
-			place_pose.position.x=dropbox_position[0]
+			place_pose.position.x=dropbox_position[0]+pick_object['offset']
 			place_pose.position.y=dropbox_position[1]
 			place_pose.position.z=dropbox_position[2]
 			# Log 
