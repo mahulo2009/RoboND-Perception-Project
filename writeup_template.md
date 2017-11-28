@@ -7,6 +7,8 @@
 [image3]: ./misc_images/exercise-1-passthrough.png
 [image4]: ./misc_images/exercise-1-inliers.png
 [image5]: ./misc_images/exercise-1-outliers.png
+[image6]: ./misc_images/exercise-2-gazebo.png
+[image7]: ./misc_images/exercise-2-rviz.png
 
 
 ## Pipeline for filtering and RANSAC plane fitting implemented.
@@ -72,12 +74,13 @@ extracted_outliers = cloud_filtered.extract(inliers, negative=True)
 
 ![alt text][image5]
 
-
-
 ## Pipeline including clustering for segmentation implemented.
 
-In the second exercise a ros node written in python has been done. This node subscribe to the topic /sensor_stick/point clould in order to receive a Point Clould similar to the previous excersice, a tablepot with several objects on top. After appying several filters, the same 
+In the second exercise a ros node written in python has been done. This node subscribes to the topic /sensor_stick/point_clould in order to receive a Point Clould similar to the previous exercise, a tablepot with several objects on top. After appying several filters, the same than in the exercise 1, the inliers, the tabletop, is published into the /pcl_table topic. An additional step is done to apply a Euclidean Clustering for the outlier, the objects on the tabletop. A different color is given to every detected object in the scene. The result is published into /pcl_object topic.
 
+![alt text][image6]
+
+![alt text][image7]
 
 
 
