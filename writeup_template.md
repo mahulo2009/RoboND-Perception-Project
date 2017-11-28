@@ -1,4 +1,87 @@
-## Project: Perception Pick & Place
+# Project: Perception Pick & Place
+
+[//]: # (Image References)
+
+[image1]: ./misc_images/exercise-1-tablepod.png
+[image2]: ./misc_images/exercise-1-voxgrid.png
+[image3]: ./misc_images/exercise-1-passthrough.png
+[image4]: ./misc_images/exercise-1-inliers.png
+[image5]: ./misc_images/exercise-1-outliers.png
+
+
+## Pipeline for filtering and RANSAC plane fitting implemented.
+
+In the first exercise a Point Cloud for a tabletop with several object on top is given. Several filters are applied to finally generate a new Point Cloud for the objects and the tabletop separately. 
+
+![alt text][image1]
+
+The first filter is a Vox Grid filter in order to downsample the Point Cloud. This will decrease the number of elements to process in the next filters. After playing around a leaf size of 1 cm has been choosen.
+
+```python
+###### Voxel Grid filter
+# Create a VoxelGrid filter object for our input point cloud
+voxel_grid_filter = cloud.make_voxel_grid_filter()
+# Set the voxel (or leaf) size  
+voxel_grid_filter.set_leaf_size(0.01, 0.01, 0.01)
+# Call the filter function to obtain the resultant downsampled point cloud
+cloud_filtered = voxel_grid_filter.filter()
+```
+
+![alt text][image2]
+
+
+The next filter is a pass through filter to cut off values outside a given range. In this case the Z axe is used, to eliminate the Point Cloud in the scene thar are not the tabletop itself or the objects on the tabletop.
+
+```python
+###### PassThrough filter
+# Create a PassThrough filter object.
+passthrough_filter = cloud_filtered.make_passthrough_filter()
+# Assign axis and range to the passthrough filter object.
+filter_axis = 'z'
+passthrough_filter.set_filter_field_name(filter_axis)
+axis_min = 0.6
+axis_max = 1.1
+passthrough_filter.set_filter_limits(axis_min, axis_max)
+# Finally use the filter function to obtain the resultant point cloud. 
+cloud_filtered = passthrough_filter.filter()
+```
+
+![alt text][image3]
+
+Finally, a RANSAC filter is used to detect the tabletop. A fit with a plane model is used, since the tabletop has got a shape similar to a plane. This will allow to separate the tabletop, the inliers, from the objects on the table, the outliers.
+
+```python
+###### RANSAC plane segmentation
+# Create the segmentation object
+segmenter = cloud_filtered.make_segmenter()
+# Set the model you wish to fit 
+segmenter.set_model_type(pcl.SACMODEL_PLANE)
+segmenter.set_method_type(pcl.SAC_RANSAC)
+# Max distance for a point to be considered fitting the model
+max_distance = 0.01
+segmenter.set_distance_threshold(0.01)
+# Call the segment function to obtain set of inlier indices and model coefficients
+inliers, coefficients = segmenter.segment()
+# Extract inliers
+extracted_inliers = cloud_filtered.extract(inliers, negative=False)
+# Extract outliers
+extracted_outliers = cloud_filtered.extract(inliers, negative=True)
+```
+
+![alt text][image4]
+
+![alt text][image5]
+
+
+
+## Pipeline including clustering for segmentation implemented.
+
+In the second exercise a ros node written in python has been done. This node subscribe to the topic /sensor_stick/point clould in order to receive a Point Clould similar to the previous excersice, a tablepot with several objects on top. After appying several filters, the same 
+
+
+
+
+
 ### Writeup Template: You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
 
 ---
