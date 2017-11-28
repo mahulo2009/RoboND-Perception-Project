@@ -78,7 +78,60 @@ extracted_outliers = cloud_filtered.extract(inliers, negative=True)
 
 In the second exercise a ros node written in python has been done. This node subscribes to the topic /sensor_stick/point_clould in order to receive a Point Clould similar to the previous exercise, a tablepot with several objects on top. After appying several filters, the same than in the exercise 1, the inliers, the tabletop, is published into the /pcl_table topic. An additional step is done to apply a Euclidean Clustering for the outlier, the objects on the tabletop. A different color is given to every detected object in the scene. The result is published into /pcl_object topic.
 
+### Creating the ros node
+
+Creates a ros node, called clustering, to subscribe to the Point Cloud, coming from a gazebo, with a tablepod with object on top.
+
+
+```python
+if __name__ == '__main__':
+    # ROS node initialization
+    rospy.init_node('clustering',anonymous=True)
+    # Create Subscribers
+    pcl_sub = rospy.Subscriber("/sensor_stick/point_cloud",pc2.PointCloud2,pcl_callback,queue_size=1)
+    # Create Publishers
+    pcl_objects_pub = rospy.Publisher("/pcl_objects",pc2.PointCloud2,queue_size=1)
+    pcl_table_pub = rospy.Publisher("/pcl_table",pc2.PointCloud2,queue_size=1)
+    # Initialize color_list
+    get_color_list.color_list = []
+    # Spin while node is not shutdown
+    while not rospy.is_shutdown():
+     rospy.spin()
+```
+
 ![alt text][image6]
+
+### Euclidean Clustering
+
+Euclidean Cluster algorithm to segment the Point Cloud into individual objects. A diffent color per object is used to visualiza the result.
+
+
+```python
+# Euclidean Clustering
+pcl_data_objects_xyz = XYZRGB_to_XYZ(pcl_data_objects)
+tree = pcl_data_objects_xyz.make_kdtree()
+EuclideanClusterExtraction = pcl_data_objects_xyz.make_EuclideanClusterExtraction()
+EuclideanClusterExtraction.set_ClusterTolerance(0.05)
+EuclideanClusterExtraction.set_MinClusterSize(100)
+EuclideanClusterExtraction.set_MaxClusterSize(2000)
+# Search the k-d tree for clusters
+EuclideanClusterExtraction.set_SearchMethod(tree)
+# Extract indices for each of the discovered clusters
+cluster_indices = EuclideanClusterExtraction.Extract()
+```
+
+```python
+# Create Cluster-Mask Point Cloud to visualize each cluster separately
+cluster_color = get_color_list(len(cluster_indices))
+color_cluster_point_list = []
+for j, indices in enumerate(cluster_indices):
+for i, indice in enumerate(indices):
+    color_cluster_point_list.append([pcl_data_objects_xyz[indice][0],
+                                     pcl_data_objects_xyz[indice][1],
+                                     pcl_data_objects_xyz[indice][2],
+                                     rgb_to_float(cluster_color[j])])
+
+```
 
 ![alt text][image7]
 
