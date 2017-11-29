@@ -1,7 +1,10 @@
 object_list:
   - name: biscuits
     group: green
+    offset: 0.0
   - name: soap
     group: green
+    offset: 0.0
   - name: soap2
     group: red
+    offset: 0.0
