@@ -30,7 +30,7 @@ rotate=0.0
 state=0
 collidable_to_pub_list = []
 
-join_state_name="X"
+join_state_name="world_joint"
 join_state_value=0.0
 
 # Helper function to get surface normals
@@ -55,6 +55,7 @@ def send_to_yaml(yaml_filename, dict_list):
         yaml.dump(data_dict, outfile, default_flow_style=False)
         
 def joint_state_callback(joint_state):
+    global join_state_value
     names=joint_state.name
     positions=joint_state.position
     
@@ -153,29 +154,31 @@ def pcl_callback(ros_msg):
         ros_table_msg_x = pcl_to_ros(collidable_to_pub)
         collidable_pub.publish(ros_table_msg_x)
 
+    print(join_state_value)
     # TODO: Rotate PR2 in place to capture side tables for the collision map
     value = Float64()
     if state==0:
         value.data=-1.7
         world_joint_pub.publish(value)
+
         if np.fabs(join_state_value+1.7) < 1e-3:
             state=1
-        else:
-            return
+       
+        return
     elif state==1:
         value.data=1.7
         world_joint_pub.publish(value)
         if np.fabs(join_state_value-1.7) < 1e-3:
             state=2
-        else:
-            return
+        
+        return
     elif state==2:
         value.data=0.0
         world_joint_pub.publish(value)
         if np.fabs(join_state_value) < 1e-3:
             state=3
-        else:
-            return
+        
+        return
 
     detected_objects = []
     detected_objects_labels = []
@@ -234,7 +237,7 @@ def pr2_mover(detected_object_list):
     # TODO: Initialize variables
     # TODO How to get this value? 
     test_scene_num = Int32()
-    test_scene_num.data = 3 
+    test_scene_num.data = 1 
     arm_name = String() 
     object_name = String() 
     pick_pose = Pose()
@@ -250,58 +253,59 @@ def pr2_mover(detected_object_list):
     ## Loop through the pick list
     for pick_object in pick_object_list:
         print("Search Pick: ",pick_object['name'])
-    for detected_object in detected_object_list:		
-        print("Current detected_object: ",detected_object.label)
-        if pick_object['name'] == detected_object.label:        
-            object_name.data=pick_object['name']
-            print("Pick: ",pick_object['name'])
-                        ## TODO
-            for detected_object_colliable in detected_object_list:
-                if detected_object_colliable.label!=detected_object.label:
-                    print("detected_object_colliable=", detected_object_colliable.label)
-                    collidable_pub.publish(pcl_to_ros(detected_object_colliable.cloud))
+        for detected_object in detected_object_list:		
+            print("Current detected_object: ",detected_object.label)
+            if pick_object['name'] == detected_object.label:        
+                object_name.data=pick_object['name']
+                print("Pick: ",pick_object['name'])
+                ## TODO
+                for detected_object_colliable in detected_object_list:
+                    if detected_object_colliable.label!=detected_object.label:
+                        print("detected_object_colliable=", detected_object_colliable.label)
+                        collidable_pub.publish(pcl_to_ros(detected_object_colliable.cloud))
 
-                 ## Get the PointCloud for a given object and obtain it's centroid
-            # Calculate the centroid
-            centroid=np.mean(detected_object.cloud.to_array(), axis=0)[:3]
+                ## Get the PointCloud for a given object and obtain it's centroid
+                # Calculate the centroid
+                centroid=np.mean(detected_object.cloud.to_array(), axis=0)[:3]
                 # Create 'place_pose' for the object
-            # Fill up the position for the pick object
-            pick_pose.position.x=np.asscalar(centroid[0])
-            pick_pose.position.y=np.asscalar(centroid[1])
-            pick_pose.position.z=np.asscalar(centroid[2])
+                # Fill up the position for the pick object
+                pick_pose.position.x=np.asscalar(centroid[0])
+                pick_pose.position.y=np.asscalar(centroid[1])
+                pick_pose.position.z=np.asscalar(centroid[2])
 
                 ## Assign the arm to be used for pick_place
-            # Find the box to drop the object into.
-            for dropbox in dropbox_list:
-                if dropbox['group']==pick_object['group']:
-                    arm_name.data=dropbox['name']    
-                    dropbox_position = dropbox['position']
-                    break
-            # Fill up the box position
-            place_pose.position.x=dropbox_position[0]+pick_object['offset']
-            place_pose.position.y=dropbox_position[1]
-            place_pose.position.z=dropbox_position[2]
-            # Log 
-            rospy.loginfo('Pick object {} with arm: {} and position [{},{},{}]'.format(object_name.data,arm_name.data,centroid[0],centroid[1],centroid[2]))
+                # Find the box to drop the object into.
+                for dropbox in dropbox_list:
+                    if dropbox['group']==pick_object['group']:
+                        arm_name.data=dropbox['name']    
+                        dropbox_position = dropbox['position']
+                        break
 
-            ## Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
-            yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
-            dict_list.append(yaml_dict)
+                # Fill up the box position
+                place_pose.position.x=dropbox_position[0]+pick_object['offset']
+                place_pose.position.y=dropbox_position[1]
+                place_pose.position.z=dropbox_position[2]
+                # Log 
+                rospy.loginfo('Pick object {} with arm: {} and position [{},{},{}]'.format(object_name.data,arm_name.data,centroid[0],centroid[1],centroid[2]))
+   
+                ## Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
+                yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
+                dict_list.append(yaml_dict)
 
-            # Wait for 'pick_place_routine' service to come up
-            rospy.wait_for_service('pick_place_routine')
+                # Wait for 'pick_place_routine' service to come up
+                rospy.wait_for_service('pick_place_routine')
 
-            try:
-                pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+                try:
+                    pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
 
-                # TODO: Insert your message variables to be sent as a service reques
-                resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-                print ("Response: ",resp.success)
+                    # TODO: Insert your message variables to be sent as a service reques
+                    resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
+                    print ("Response: ",resp.success)
 
-            except rospy.ServiceException, e:
-                print "Service call failed: %s"%e
+                except rospy.ServiceException, e:
+                    print "Service call failed: %s"%e
 
-            return
+                return
 
     ## Output your request parameters into output yaml file
     send_to_yaml("dict_list.yaml",dict_list)
@@ -313,7 +317,7 @@ if __name__ == '__main__':
 
     ## Create Subscribers
     pcl_sub = rospy.Subscriber("/pr2/world/points",PointCloud2, pcl_callback, queue_size=1)
-    world_joint_sub = rospy.Publisher("/joint_states",JointState,joint_state_callback,queue_size=1)
+    world_joint_sub = rospy.Subscriber("/joint_states",JointState,joint_state_callback,queue_size=1)
 
     ## Create Publishers
     pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)

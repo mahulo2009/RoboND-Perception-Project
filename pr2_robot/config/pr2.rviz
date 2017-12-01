@@ -646,7 +646,7 @@ Visualization Manager:
       Marker Topic: /object_markers
       Name: Marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
@@ -680,9 +680,9 @@ Visualization Manager:
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.950943351
-        Y: 0.0314318687
-        Z: 0.913107574
+        X: 0.796913385
+        Y: 0.02467403
+        Z: 1.13826644
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
