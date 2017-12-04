@@ -101,6 +101,10 @@ class PointCloudSubscriber:
         # PassThrough Filter
         self.pcl_data=self.passthrough(self.pcl_data)
         
+        if self.position_to_move_robot_index == len(self.position_to_move_robot):
+            self.pcl_data=self.passthrough_y(self.pcl_data)
+            
+        
         # RANSAC Plane Segmentation
         pcl_data_table, pcl_data_objects = self.segmenter(self.pcl_data)
                
@@ -251,6 +255,16 @@ class PointCloudSubscriber:
         passthrough_filter.set_filter_field_name(filter_axis)
         axis_min = 0.6
         axis_max = 1.1
+        passthrough_filter.set_filter_limits(axis_min, axis_max)
+        pcl_data = passthrough_filter.filter()
+        return pcl_data
+    
+    def passthrough_y(self,pcl_data):
+        passthrough_filter = pcl_data.make_passthrough_filter()
+        filter_axis = 'y'
+        passthrough_filter.set_filter_field_name(filter_axis)
+        axis_min = -0.4
+        axis_max = 0.4
         passthrough_filter.set_filter_limits(axis_min, axis_max)
         pcl_data = passthrough_filter.filter()
         return pcl_data
