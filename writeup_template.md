@@ -315,6 +315,7 @@ for collidable_to_pub in self.collidable_to_pub_list:
     collidable_pub.publish(ros_collidable_to_pub)
 ```
 
+```python
 # Add to the collidable publisher the objects that are not going to be collect in this run  
 for detected_object_colliable in detected_object_list:
     if detected_object_colliable.label!=detected_object_found.label:
