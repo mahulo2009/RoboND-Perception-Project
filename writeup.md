@@ -323,3 +323,10 @@ for detected_object_colliable in detected_object_list:
         collidable_pub.publish(pcl_to_ros(detected_object_colliable.cloud))
 
 ```
+
+
+## Conclusion
+
+The recognition algorithm, using the filter, worked quite well. Also, the robot was able to make the 3D collision map, after rotating about itself, satisfactorily. I found a problem when the offset to place the object in the bin was to high, the navigation plan was not able to calculate the trajectory; I think it happens due to the arm was not able to get to this position without rotation the robot. The performance of the script was poor, I think I will need to run the script in a powerfull computer or to completly write it in C++ rather than python.
+
+
