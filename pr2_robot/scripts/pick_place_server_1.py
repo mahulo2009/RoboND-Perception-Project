@@ -50,7 +50,9 @@ def send_to_yaml(yaml_filename, dict_list):
 
 class JointStateSubscriber:
 
+
     def __init__(self):
+        self.lock = threading.Lock()
         self.subsriber = rospy.Subscriber("/joint_states",JointState,self.callback,queue_size=1)
         self.name = []
         self.position = []
@@ -79,7 +81,7 @@ class PointCloudSubscriber:
         self.collidable_to_pub_list = []
         self.position_to_move_robot_index=0
         self.state_subcriber=JointStateSubscriber
-        self.position_to_move_robot= [-1.7,0,11.7]
+        self.position_to_move_robot= [-1.7,0,1.7,0]
          
     def statistical(self,pcl_data):
         statistical_outlier_filter = pcl_data.make_statistical_outlier_filter()
@@ -140,9 +142,9 @@ class PointCloudSubscriber:
         pcl_data_objects_clustered = pcl.PointCloud_PointXYZRGB()
         pcl_data_objects_clustered.from_list(color_cluster_point_list)
         
-        return cluster_indices,pcl_data_objects_clustered
+        return cluster_indices,pcl_data_objects_clustered,pcl_data_objects_xyz
         
-    def classifier(self,pcl_data_objects,cluster_indices):
+    def classifier(self,pcl_data_objects,cluster_indices,pcl_data_objects_xyz):
         detected_objects = []
         detected_objects_labels = []
         ## Classify the clusters! (loop through each detected cluster one at a time)
@@ -212,18 +214,18 @@ class PointCloudSubscriber:
         pcl_table_pub.publish(ros_data_table)
         
         ##TODO
-        collidable_to_pub_list.append(pcl_data_table)
-        for collidable_to_pub in collidable_to_pub_list:
+        self.collidable_to_pub_list.append(pcl_data_table)
+        for collidable_to_pub in self.collidable_to_pub_list:
             ros_collidable_to_pub = pcl_to_ros(collidable_to_pub)
             collidable_pub.publish(ros_collidable_to_pub)
 
         ## MOVE ROBOT        
-        if self.state < len(self.position_to_move_robot):
+        if self.position_to_move_robot_index < len(self.position_to_move_robot):
             self.move_robot(self.position_to_move_robot[self.position_to_move_robot_index])
             return
         
         ### Euclidean Clustering
-        cluster_indices, pcl_data_objects_clustered = self.cluster(pcl_data_objects)
+        cluster_indices, pcl_data_objects_clustered,pcl_data_objects_xyz = self.cluster(pcl_data_objects)
         
         ### Convert PCL data object clustered to ROS messages
         ros_data_objects_clustered = pcl_to_ros(pcl_data_objects_clustered)
@@ -232,7 +234,7 @@ class PointCloudSubscriber:
         pcl_objects_pub.publish(ros_data_objects_clustered)
 
         ### Classify the clusters! (loop through each detected cluster one at a time)
-        detected_objects_labels,detected_objects = self.classifier(pcl_data_objects,cluster_indices)
+        detected_objects_labels,detected_objects = self.classifier(pcl_data_objects,cluster_indices,pcl_data_objects_xyz)
         
         rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
 
