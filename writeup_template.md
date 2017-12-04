@@ -236,7 +236,7 @@ detected_objects_pub.publish(detected_objects)
 
 The implementation of the project include: to recognize the objects on the tablepod, to place them in the bin without piling up them, to rotate the robot to create a 3D collision map of the scene. The following sections will explain how this goals have been achive.
 
-# Recognize the Objects
+### Recognize the Objects
 
 This part of the project have been done using the same filters than in the previous exercise. In order to train the SVM the script capture_features.py have been modified to include the objects for the three different worlds.
 
@@ -263,17 +263,62 @@ The PR2 Pick and Place simulator was executed with the three different tabletop 
 ![alt text][image14]
 
 
-# Place in the bin withou piling up
+### Place in the bin withou piling up
 
 A new parameter has been included in the pick_list_x.yaml file, offset, in order to not place the object in the same position of the bin. This offset is added to X axes of the pose location.
 
+```python
+# Fill up the box position
+place_pose.position.x=dropbox_position[0]+pick_object['offset'] # Include an offset to place the obejct in differents parts of the bin
+place_pose.position.y=dropbox_position[1]
+place_pose.position.z=dropbox_position[2]
+
+```
+
+### Create a 3D collision map 
+
+Everytime a new Point Cloud is received a call to the clear_octomap is done in order to start with a new a fresh collision map.
+
+```python
+    def clear_octomap(self):
+        rospy.wait_for_service('/clear_octomap')
+        try:
+            clear_octomap = rospy.ServiceProxy('/clear_octomap', Empty)
+            clear_octomap()
+            print ("Response: OK" )     
+        except rospy.ServiceException, e:
+            print "Service clear_octomap call failed: %s"%e
+
+```
+
+The robot is rotated to the left and then to the right, the Point Cloud is analysed with the filters in order to extract the tabletop and the result is store into a list. Finally, these Points Cloud together with the objects we are not picking up in this iteration are sent to the /pr2/3d_map/point topic.
 
 
+```python
+    self.position_to_move_robot= [-1.7,0,1.7,0]
 
+    def move_robot(self,fvalue):
+        value = Float64()
+        value.data=fvalue
+        world_joint_pub.publish(value)
+        if np.fabs(self.state_subcriber.get_joint_position('world_joint')-fvalue) < 1e-3:
+            self.position_to_move_robot_index+=1
 
+```
 
+```python
+# Add the table to the collidable objects. It stores the previous point cloud
+# ir order to publish this values as the robot rotate around the scene
+self.collidable_to_pub_list.append(pcl_data_table)
+for collidable_to_pub in self.collidable_to_pub_list:
+    ros_collidable_to_pub = pcl_to_ros(collidable_to_pub)
+    collidable_pub.publish(ros_collidable_to_pub)
+```
 
+# Add to the collidable publisher the objects that are not going to be collect in this run  
+for detected_object_colliable in detected_object_list:
+    if detected_object_colliable.label!=detected_object_found.label:
+        print("detected_object_colliable=", detected_object_colliable.label)
+        collidable_pub.publish(pcl_to_ros(detected_object_colliable.cloud))
 
-
-
-
+```
